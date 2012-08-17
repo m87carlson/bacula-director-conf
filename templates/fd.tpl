@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 client {
     Name = {{ fqdn }}-fd
     Address = {{ fqdn }}
