@@ -3,6 +3,8 @@ import sys
 import os, os.path
 import ConfigParser
 import uuid
+import string, random
+from OpenSSL import crypto
 
 try:
         from couchdbkit import *
@@ -21,9 +23,13 @@ except ImportError:
         print >>sys.stderr, 'ERROR: cclient requires argparse'
         sys.exit(1)
 
-def_conf = "./fd.conf"
+
+# Global Defaults
+bdir        = "/usr/local/etc/bacula/"
+bcert_dir   = bdir + "certs/"
 
 def read_in_args_and_conf():
+        def_conf = "./fd.conf"
         config = {}
         argp = argparse.ArgumentParser(
                         description='Create a FD configuration file Bacula',
@@ -109,7 +115,7 @@ def read_in_args_and_conf():
 
 def write_fd_conf(hostname, schedule, fqdn, os_type, passhash, client_dir="/usr/local/etc/bacula/client.d" ):
         filehandle = open(client_dir + "/" + hostname + ".conf", "w")
-        env = Environment(loader=PackageLoader('cclient', 'templates'))
+        env = Environment(loader=PackageLoader('badd', 'templates'))
         template = env.get_template('fd.tpl')
         filehandle.write( template.render(schedule=schedule, fqdn=fqdn, os_type=os_type, passhash=passhash) )
         filehandle.close()
@@ -128,25 +134,88 @@ def get_record_from_couchdb(fd):
 def create_new_couchdb_record(fd):
         server = Server(uri="https://puppet.bayphoto.local")
         db = server.get_db('bacula_meta')
-        passhash = uuid.uuid4().bytes.encode("base64")
+        passhash = generate_passhash()
         db[fd] = dict(host=fd, passhash=passhash)
-        
+
+def generate_passhash():
+        return ''.join(random.choice(string.ascii_letters + string.digits) for x in range(32))
+
 def get_cert_from_couchdb(fd, domain):
         server = Server(uri="https://puppet.bayphoto.local")
         db = server.get_db('bacula_meta')
 
-        certificate = fd + '.' + domain + "-fd.pem"
+        cert_name = fd + '.' + domain + "-fd.pem"
         try:
-            pem = db.fetch_attachment(fd, certificate)
+            pem = db.fetch_attachment(fd, cert_name)
         except:
             print >>sys.stderr, 'ERROR, %s is not in couchdb. Please generate a cert.' % fd
+            pem = generate_ssl_keypair(bcert_dir, fd + '.' + domain)
+            print pem 
+            push_cert_to_couchdb( fd, domain, pem) 
 
             sys.exit(1)
 
         return pem
 
-def generate_ssl_keypair(fd):
-        #TODO create ssl keypair function, return file
+def push_cert_to_couchdb(fd,domain,pem):
+        server = Server(uri="https://puppet.bayphoto.local")
+        db = server.get_db('bacula_meta')
+        doc = db.get(fd)
+
+        cert_name = fd + '.' + domain + "-fd.pem"
+        print cert_name
+        print fd
+
+        with open(bcert_dir + cert_name) as f:
+                db.put_attachment(doc,f,cert_name)
+
+def generate_ssl_keypair(cert_dir, fqdn, is_valid=True):
+        if not os.path.exists(cert_dir):
+                os.makedirs(cert_dir)
+
+        cert_path = os.path.join(cert_dir, fqdn + '.crt')
+        key_path = os.path.join(cert_dir, fqdn + '.key')
+        pem_path = os.path.join(cert_dir, fqdn + '-fd.pem')
+
+        if os.path.exists(cert_path):
+                os.unlink(cert_path)
+
+        if os.path.exists(key_path):
+                os.unlink(key_path)
+
+        if os.path.exists(pem_path):
+                os.unlink(pem_path)
+
+        # create a key pair
+        key = crypto.PKey()
+        key.generate_key(crypto.TYPE_RSA, 2048)
+                                                                               
+        # create a self-signed cert            
+        cert = crypto.X509()
+        cert.get_subject().C = 'US'
+        cert.get_subject().ST = 'California'
+        cert.get_subject().L = 'Santa Cruz'
+        cert.get_subject().O = 'Bay Photo Lab'
+        cert.get_subject().OU = 'IT'
+        cert.get_subject().CN = fqdn
+        cert.set_serial_number(1000)
+        cert.gmtime_adj_notBefore(0)
+        cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
+        cert.set_issuer(cert.get_subject())
+        cert.set_pubkey(key)
+        cert.sign(key, 'sha1')
+
+        with open(cert_path, 'wt') as fd:
+                fd.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+
+        with open(key_path, 'wt') as fd:
+                fd.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
+
+        with open(pem_path, 'wt') as pemfile:
+                pemfile.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+                pemfile.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
+
+        return pem_path
 
 def main():
         args        = read_in_args_and_conf()
