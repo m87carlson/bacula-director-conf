@@ -123,7 +123,7 @@ def read_in_args_and_conf():
 
 def write_fd_conf(hostname, schedule, fqdn, os_type, passhash, client_dir="/usr/local/etc/bacula/client.d" ):
         f = open(client_dir + "/" + hostname + ".conf", "w")
-        env = Environment(loader=PackageLoader('badd', 'templates'))
+        env = Environment(loader=PackageLoader('bcreate-fd', 'templates'))
         template = env.get_template('fd.tpl')
         f.write( template.render(schedule=schedule, fqdn=fqdn, os_type=os_type, passhash=passhash) )
         f.close()
