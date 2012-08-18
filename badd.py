@@ -27,6 +27,8 @@ except ImportError:
 # Global Defaults
 bdir        = "/usr/local/etc/bacula/"
 bcert_dir   = bdir + "certs/"
+couchdb_server = "https://puppet.bayphoto.local/"
+couchdb_db  = 'bacula_meta'
 
 def read_in_args_and_conf():
         def_conf = "./fd.conf"
@@ -60,10 +62,12 @@ def read_in_args_and_conf():
                                 'osx' 
                               ]
         os_type_default     = 'unix'
+        bacula_dir_default  = '/usr/local/etc/bacula/'
+        bacula_cert_dir_default = bacula_dir_default + 'certs/'
 
         argp.add_argument(
                         '-c', '--config',
-                        default = "def_conf",
+                        default = def_conf,
                         dest = 'configfile',
                         help = "Use a different configuration file other than %s" % def_conf
         )
@@ -95,34 +99,38 @@ def read_in_args_and_conf():
                         required = True
         )
 
+        # Read in the arguments
         args = argp.parse_args()
 
+        # Set up cfgfile parser
         cfgp = ConfigParser.ConfigParser()
-        try:
-                cfgp.read(def_conf)
-        except:
-                print >>sys.stderr, "ERROR: There is an error in the config file: %s" % def_conf
-                sys.exit(1)
-
         cfgp.read(args.configfile)
-
+        
+        # Read all sections of the configfile into the config dictionary
         for section in cfgp.sections():
                 config.update(dict(cfgp.items(section)))
 
-        print "%s, %s, %s, %s" % ( args.schedule, args.hostname, args.os_type, args.domain )
+        config.update(dict(args._get_kwargs()))
 
-        return args
+        print "Adding host: %s" % config['hostname']
+        print """
+            FQDN:       %s
+            Schedule:   %s
+            OS:         %s
+        """ % ( config['hostname'] + "." + config['domain'], config['schedule'], config['os_type'] )
+
+        return config
 
 def write_fd_conf(hostname, schedule, fqdn, os_type, passhash, client_dir="/usr/local/etc/bacula/client.d" ):
-        filehandle = open(client_dir + "/" + hostname + ".conf", "w")
+        f = open(client_dir + "/" + hostname + ".conf", "w")
         env = Environment(loader=PackageLoader('badd', 'templates'))
         template = env.get_template('fd.tpl')
-        filehandle.write( template.render(schedule=schedule, fqdn=fqdn, os_type=os_type, passhash=passhash) )
-        filehandle.close()
+        f.write( template.render(schedule=schedule, fqdn=fqdn, os_type=os_type, passhash=passhash) )
+        f.close()
 
 def get_record_from_couchdb(fd):
-        server = Server(uri="https://puppet.bayphoto.local")
-        db = server.get_db('bacula_meta')
+        server = Server(uri=couchdb_server)
+        db = server.get_db(couchdb_db)
         try:
                 db.get(fd)
         except:
@@ -132,8 +140,8 @@ def get_record_from_couchdb(fd):
         return db.get(fd)
 
 def create_new_couchdb_record(fd):
-        server = Server(uri="https://puppet.bayphoto.local")
-        db = server.get_db('bacula_meta')
+        server = Server(uri=couchdb_server)
+        db = server.get_db(couchdb_db)
         passhash = generate_passhash()
         db[fd] = dict(host=fd, passhash=passhash)
 
@@ -141,14 +149,14 @@ def generate_passhash():
         return ''.join(random.choice(string.ascii_letters + string.digits) for x in range(32))
 
 def get_cert_from_couchdb(fd, domain):
-        server = Server(uri="https://puppet.bayphoto.local")
-        db = server.get_db('bacula_meta')
+        server = Server(uri=couchdb_server)
+        db = server.get_db(couchdb_db)
 
         cert_name = fd + '.' + domain + "-fd.pem"
         try:
             pem = db.fetch_attachment(fd, cert_name)
         except:
-            print >>sys.stderr, 'ERROR, %s is not in couchdb. Please generate a cert.' % fd
+            print >>sys.stderr, '%s is not in couchdb. A new certificate will be generated.' % fd
             pem = generate_ssl_keypair(bcert_dir, fd + '.' + domain)
             print pem 
             push_cert_to_couchdb( fd, domain, pem) 
@@ -158,8 +166,8 @@ def get_cert_from_couchdb(fd, domain):
         return pem
 
 def push_cert_to_couchdb(fd,domain,pem):
-        server = Server(uri="https://puppet.bayphoto.local")
-        db = server.get_db('bacula_meta')
+        server = Server(uri=couchdb_server)
+        db = server.get_db(couchdb_db)
         doc = db.get(fd)
 
         cert_name = fd + '.' + domain + "-fd.pem"
@@ -219,14 +227,14 @@ def generate_ssl_keypair(cert_dir, fqdn, is_valid=True):
 
 def main():
         args        = read_in_args_and_conf()
-        fd_conf     = open(args.hostname + ".conf", "w")
-        doc         = get_record_from_couchdb(args.hostname)
-        pem         = get_cert_from_couchdb(args.hostname, args.domain)
 
-        fd_hostname = args.hostname
-        fd_schedule = args.schedule
-        fd_fqdn     =  args.hostname + "." + args.domain
-        fd_os_type  = args.os_type
+        fd_hostname = args['hostname']
+        fd_domain   = args['domain']
+        fd_schedule = args['schedule']
+        fd_fqdn     = fd_hostname + "." + fd_domain
+        fd_os_type  = args['os_type']
+
+        doc         = get_record_from_couchdb(fd_hostname)
         fd_passhash = doc['passhash']
 
         write_fd_conf(
