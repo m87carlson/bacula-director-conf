@@ -31,7 +31,7 @@ Job {
     Level = Incremental
     FileSet = "{{ fqdn }} FileSet"
     Client = "{{ fqdn }}-fd"
-    Storage = SD1FileD386
+    Storage =  {{ storage_node }}
     Pool = {{ fqdn }}-File
     Schedule = "{{ schedule }}"
     Messages = Standard
@@ -73,7 +73,7 @@ Job {
     Type = Restore
     Client= {{ fqdn }}-fd
     FileSet="{{ fqdn }} FileSet"
-    Storage = SD1FileD386
+    Storage = {{ storage_node }}
     Pool = {{ fqdn }}-File
     Messages = Standard
     #Where = /tmp/bacula-restores
@@ -81,21 +81,23 @@ Job {
 
 {% if os_type == "win" %}
 FileSet {
-    Name = "{{ fqdn}} FileSet"
+    Name = "{{ fqdn }} FileSet"
     Enable VSS = yes
     Include {
         Options {
             signature = MD5
-            compression = GZIP2
-            wild = "P:/BACKUP/DP2_DATABASE/*.BAK"
+            compression = GZIP6
+                Exclude = yes
+                @/usr/local/etc/bacula/excludes.d/common.conf
         }
         File = C:/
         Exclude Dir Containing = excludeme
     }
     Exclude {
         @/usr/local/etc/bacula/excludes.d/win.conf
-   }
+    }
 }
+
 {% elif os_type == "unix" %}
 FileSet {
     Name = "{{ fqdn }} FileSet"
