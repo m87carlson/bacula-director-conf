@@ -1,0 +1,15 @@
+# Sample fileset:
+FileSet {
+  Name = "Base_FreeBSD"
+  Include {
+    Options {
+      signature = MD5
+      compression = GZIP
+    }
+
+    File = /etc
+    File = /boot
+    File = /var/db
+    File = /usr/local/etc
+  }
+}

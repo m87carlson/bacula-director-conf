@@ -1,0 +1,11 @@
+# example storage node definition. The bcreate-fd script assumes you have at 
+#  least one storage node server, and 512 "Drives" (SD1FileD1 - SD1FileD512)
+Storage {
+  Name = SD1FileD1
+  Device = SD1FileD1
+  Address = sd-1.example.com
+  SDPort = 9103
+  Password = "sdpassword"
+  Maximum Concurrent Jobs = 20
+  Media Type = File
+}
