@@ -19,7 +19,7 @@ bacula
 |   |-- common.conf     #  -Common across all platforms
 |   |-- unix.conf       #  -Linux/unix files to exclude
 |   `-- win.conf        #  -Windows files to exclude
-|-- filesets.conf       # Custom filesets
+|-- filesets.d          # Custom filesets
 |-- messages.d          # Director for custom message directives
 |-- schedules.conf      # Custom Schedules
 `-- storage.d           # Directory for storage node configuration(s)
