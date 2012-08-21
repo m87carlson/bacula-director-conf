@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import re
 import sys, os, os.path
 import string, random, uuid
@@ -8,33 +9,55 @@ from OpenSSL import crypto
 try:
         from couchdbkit import *
 except ImportError:
-        print >>sys,stderr, 'ERROR: cclient requires CouchDB Kit'
+        print >>sys,stderr, 'Error: bcreate-fd requires CouchDB Kit. Please install using "sudo pip install couchdbkit"'
+        sys.exit(1)
 
 try:
         from jinja2 import Template, Environment, PackageLoader
 except ImportError:
-        print >>sys.stderr, 'ERROR: cclient requires Jinja2 Templates'
+        print >>sys.stderr, 'Error: bcreate-fd requires Jinja2 Templates. Please install using "sudo pip install jinja2"'
         sys.exit(1)
 
 # Global Defaults
-bdir            = '/usr/local/etc/bacula/'
+bdir            = '/etc/bacula/'
 bcert_dir       = bdir + 'certs/'
-couchdb_server  = 'https://puppet.bayphoto.local/'
+couchdb_server  = 'https://couchdb.example.com/'
 couchdb_db      = 'bacula_meta'
 
 def parse_schedules():
+        """
+        Parse Schedules will look for a schedules.conf file ( by default, in /etc/bacula/ ), look for 'Name = ' and return an array.
+
+        For example, if schedules.conf has:
+            Schedule {
+             Name = "1am"
+             Run = Full weekly friday at 1:00am
+             Run = Incremental daily at 2:00am
+            }
+
+            Schedule {
+             Name = "2am"
+             Run = Full weekly friday at 2:00am
+             Run = Incremental daily at 3:00am
+            }
+        Parse schedules would find 'Name = "1am"' and 'Name = "2am"' and return:
+            schedules = [ '1am', '2am' ]
+        """
         schedules = []
         try:
                 for line in open(bdir + "schedules.conf", "r"):
                     if "Name" in line:
                             schedules.append(line.strip().replace('"','').replace(' ','').split("=")[-1])
         except:
-                print >>sys.stderr, 'ERROR: %sschedules.conf does not exist. Please create one.' % bdir
+                print >>sys.stderr, 'Error: %sschedules.conf does not exist. Please create one.' % bdir
                 sys.exit(1)
 
         return schedules
 
 def read_in_args_and_conf():
+        """
+        Using argparse, this function will parse the arguments passed to it, and use a few defaults from the fd.conf file.
+        """
         def_conf = './fd.conf'
         config = {}
         schedule_choices = []
@@ -48,20 +71,18 @@ def read_in_args_and_conf():
 
         schedule_default    = 'Standard'
         domain_choices      = [ 
-                                'discdrive.bayphoto.com', 
-                                'bayphoto.local' 
+                                'example.org', 
+                                'example.com' 
                               ]
-        domain_default      = 'bayphoto.local'
+        domain_default      = 'example.com'
         os_type_choices     = [ 
                                 'unix', 
                                 'win', 
                                 'osx' 
                               ]
-        storage_node_choices= [ 'bup-sd-1' ]
+        storage_node_choices= [ 'sd-1' ]
 
         os_type_default     = 'unix'
-        bacula_dir_default  = '/usr/local/etc/bacula/'
-        bacula_cert_dir_default = bacula_dir_default + 'certs/'
 
         argp.add_argument(
                         '-c', '--config',
@@ -131,16 +152,47 @@ def read_in_args_and_conf():
 
         return config
 
-def write_fd_conf(hostname, schedule, fqdn, os_type, storage_node, passhash, client_dir="/usr/local/etc/bacula/client.d" ):
+def write_fd_conf(hostname, schedule, fqdn, os_type, storage_node, passhash, client_dir=bdir + "client.d" ):
         # parse and build storage node string
+        #    ex:   SD1File244
+        #            ^     ^
+        #       SD Node   Random drive letter
         node = 'SD' + storage_node.split('-')[-1] + 'File%s' % random.randint(1,512)
-        f = open(client_dir + "/" + hostname + ".conf", "w")
+        
+        # Load the bcreate jinja template environment
         env = Environment(loader=PackageLoader('bcreate-fd', 'templates'))
+        # use template/fd.tpl
         template = env.get_template('fd.tpl')
+        # 
+        f = open(client_dir + "/" + hostname + ".conf", "w")
         f.write( template.render(schedule=schedule, fqdn=fqdn, os_type=os_type, storage_node=node, passhash=passhash) )
         f.close()
 
 def get_record_from_couchdb(fd):
+        """
+        Returns a couchdb document from the couchdb_db database for the document 'fd',
+        the bacula client.
+
+        Example document:
+            {
+                "_id": "host-a",
+                "_rev":"2-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "hostname":"host-a",
+                "passhash":"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "_attachments": {
+                        "host-a.example.com-fd.pem": {
+                                "content_type":"application/octet-stream",
+                                "revpos":14,
+                                "digest":"md5-XXXXXXXXXXXXXXXXXXXXX==",
+                                "length":3399,
+                                "stub":true
+                         }
+                }
+            }
+
+        if a document does not exist, it will create a new one.
+
+        """
         server = Server(uri=couchdb_server)
         db = server.get_db(couchdb_db)
         try:
@@ -152,13 +204,26 @@ def get_record_from_couchdb(fd):
         return db.get(fd)
 
 def create_new_couchdb_record(fd):
+        """
+        Creates a new document in couchdb_db:
+        Example document:
+            {
+                "_id": "host-a",
+                "_rev":"1-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "hostname":"host-a",
+                "passhash":"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            }
+
+        """
         server = Server(uri=couchdb_server)
         db = server.get_db(couchdb_db)
         passhash = generate_passhash()
         db[fd] = dict(host=fd, passhash=passhash)
 
 def generate_passhash():
-        # Returns a 32 character random string made up of letters and digits
+        """
+        Returns a 32 character random string made up of letters and digits
+        """
         return ''.join(random.choice(string.ascii_letters + string.digits) for x in range(32))
 
 def get_cert_from_couchdb(fd, domain):
@@ -171,7 +236,7 @@ def get_cert_from_couchdb(fd, domain):
         except:
             print >>sys.stderr, '%s does not have a certificate in %s/%s. A new certificate will be generated.' % ( fd, couchdb_server, couchdb_db )
             pem = generate_ssl_keypair(bcert_dir, fd + '.' + domain)
-            push_cert_to_couchdb( fd, domain, pem) 
+            push_cert_to_couchdb(fd, domain, pem) 
 
         return pem
 
