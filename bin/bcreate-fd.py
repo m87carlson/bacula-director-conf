@@ -4,18 +4,23 @@ import sys, os, os.path
 import string, random, uuid
 import ConfigParser
 import argparse
-from OpenSSL import crypto
+
+try:
+        from OpenSSL import crypto
+except ImportError:
+        print >>sys.stderr, 'Import Error: py-openssl is missing, please install from your package provier.'
+        sys.exit(1)
 
 try:
         from couchdbkit import *
 except ImportError:
-        print >>sys,stderr, 'Error: bcreate-fd requires CouchDB Kit. Please install using "sudo pip install couchdbkit"'
+        print >>sys.stderr, 'Import Error: bcreate-fd requires CouchDB Kit. Please install using "sudo pip install couchdbkit"'
         sys.exit(1)
 
 try:
         from jinja2 import Template, Environment, PackageLoader
 except ImportError:
-        print >>sys.stderr, 'Error: bcreate-fd requires Jinja2 Templates. Please install using "sudo pip install jinja2"'
+        print >>sys.stderr, 'Import Error: bcreate-fd requires Jinja2 Templates. Please install using "sudo pip install jinja2"'
         sys.exit(1)
 
 # Global Defaults
@@ -85,6 +90,13 @@ def read_in_args_and_conf():
         os_type_default     = 'unix'
 
         argp.add_argument(
+                        '--client-conf-dir',
+                        help = 'Directory for client configuration files',
+                        dest = 'client_conf_dir',
+                        default = bdir + 'clients.d/'
+        )
+
+        argp.add_argument(
                         '-c', '--config',
                         default = def_conf,
                         dest = 'configfile',
@@ -123,7 +135,7 @@ def read_in_args_and_conf():
                         help = 'Bacula storage node location',
                         choices = storage_node_choices,
                         dest = 'storage_node',
-                        default = 'bup-sd-1'
+                        default = 'sd-1'
         )
 
         # Read in the arguments
@@ -312,6 +324,7 @@ def main():
         fd_fqdn         = fd_hostname + "." + fd_domain
         fd_os_type      = args['os_type']
         fd_storage_node = args['storage_node']
+        fd_conf_dir     = args['client_conf_dir']
 
         # Return the document from couchdb of the client
         doc         = get_record_from_couchdb(fd_hostname)
@@ -325,7 +338,8 @@ def main():
         write_fd_conf(
                         fd_hostname, fd_schedule,
                         fd_fqdn, fd_os_type,
-                        fd_storage_node, fd_passhash
+                        fd_storage_node, fd_passhash,
+                        fd_conf_dir
         )
         
         sys.exit(0)
