@@ -27,9 +27,9 @@ bacula
 ## Requirements ##
 ### Python ###
 * Python 2.7
- ** Jinja2
- ** CouchDB Kit
- ** py-openssl
+** Jinja2
+** CouchDB Kit
+** py-openssl
 
 I have not tested this with anything else but 2.7. 
 
@@ -46,7 +46,7 @@ $ sudo pip install couchdbkit
 ### CouchDB ###
 I use CoucDB to store some of the information about a bacula client (or, fd/file daemon). This allows our configuration management tool (Puppet) to retirve this information remotely and properly build a bacula-fd.conf file on the client, as well as push out a certificate.
 
-The default Couch DB server address is https://couchdb.example.conf/, and the default database is bacula_meta.
+The default Couch DB server address is https://couchdb.example.com/, and the default database is bacula_meta.
 
 Again, FreeBSD was the platform, so CouchDB was installed from ports:
 <pre>
@@ -57,8 +57,20 @@ The bacula_meta db was created with Curl:
 <pre>
 $ curl -k -X PUT http://your-couchdb-server.example.com:5984/bacula_meta
 {"ok":true}
-$ curl -k -X GET http://your-couchdb-server.example.comf:5984/bacula_meta
-{"db_name":"bacula_meta","doc_count":78,"doc_del_count":25,"update_seq":300,"purge_seq":0,"compact_running":false,"disk_size":954478,"data_size":null,"instance_start_time":"1344900522201656","disk_format_version":5,"committed_update_seq":300}
+$ curl -k -X GET http://your-couchdb-server.example.com:5984/bacula_meta
+{
+	"db_name":"bacula_meta",
+	"doc_count":78,
+	"doc_del_count":25,
+	"update_seq":300,
+	"purge_seq":0,
+	"compact_running":false,
+	"disk_size":954478,
+	"data_size":null,
+	"instance_start_time":"1344900522201656",
+	"disk_format_version":5,
+	"committed_update_seq":300
+}
 </pre>
 
 CouchDB is pretty open by default, so I highly recommend restricting access to the server and reading through the documentation on how to secure your server.
