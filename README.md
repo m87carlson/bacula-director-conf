@@ -27,9 +27,9 @@ bacula
 ## Requirements ##
 ### Python ###
 * Python 2.7
-** Jinja2
-** CouchDB Kit
-** py-openssl
+	* Jinja2
+	* CouchDB Kit
+	* py-openssl
 
 I have not tested this with anything else but 2.7. 
 
