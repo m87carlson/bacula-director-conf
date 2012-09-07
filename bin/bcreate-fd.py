@@ -293,6 +293,11 @@ def generate_ssl_keypair(cert_dir, fqdn, is_valid=True):
         cert.get_subject().O = 'Bay Photo Lab'
         cert.get_subject().OU = 'IT'
         cert.get_subject().CN = fqdn
+        
+        # Add X509v3 Extension
+        ext1 = crypto.X509Extension('subjectKeyIdentifier', False, 'hash', subject=cert )
+        cert.add_extensions([ext1])
+        
         cert.set_serial_number(1000)
         cert.gmtime_adj_notBefore(0)
         cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
