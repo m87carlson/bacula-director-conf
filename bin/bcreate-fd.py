@@ -166,10 +166,10 @@ def read_in_args_and_conf():
 
 def write_fd_conf(hostname, schedule, fqdn, os_type, storage_node, passhash, client_dir=bdir + "client.d" ):
         # parse and build storage node string
-        #    ex:   SD1File244
+        #    ex:   SD1FileD244
         #            ^     ^
         #       SD Node   Random drive letter
-        node = 'SD' + storage_node.split('-')[-1] + 'File%s' % random.randint(1,512)
+        node = 'SD' + storage_node.split('-')[-1] + 'FileD%s' % random.randint(1,512)
         
         # Load the bcreate jinja template environment
         env = Environment(loader=PackageLoader('bcreate-fd', 'templates'))
