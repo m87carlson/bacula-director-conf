@@ -217,7 +217,9 @@ def get_record_from_couchdb(couchdb_server, couchdb_db, fd):
                              }
                     }
             }
+
         if a document does not exist, it will create a new one.
+
         """
         server = Server(uri=couchdb_server)
         db = server.get_db(couchdb_db)
