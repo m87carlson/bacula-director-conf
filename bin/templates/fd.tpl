@@ -44,8 +44,6 @@ Job {
     Max Wait Time = 30 minutes
     Cancel Lower Level Duplicates = yes
     Allow Duplicate Jobs = no
-    Run After Job = "/usr/local/scripts/bacula2nagios \"%n\" 0 \"%e %l %v\""
-    Run After Failed Job = "/usr/local/scripts/bacula2nagios \"%n\" 1 \"%e %l %v\""
     {% if os_type == "unix" %}
     RunScript {
         RunsWhen = Before
@@ -88,13 +86,13 @@ FileSet {
             signature = MD5
             compression = GZIP6
                 Exclude = yes
-                @/usr/local/etc/bacula/excludes.d/common.conf
+                @/etc/bacula/excludes.d/common.conf
         }
         File = C:/
         Exclude Dir Containing = excludeme
     }
     Exclude {
-        @/usr/local/etc/bacula/excludes.d/win.conf
+        @/etc/bacula/excludes.d/win.conf
     }
 }
 
@@ -112,14 +110,14 @@ FileSet {
             fstype = zfs
             onefs = no
             Exclude = yes
-            @/usr/local/etc/bacula/excludes.d/common.conf
+            @/etc/bacula/excludes.d/common.conf
         }
         File = /
         File = /usr/local
         Exclude Dir Containing = .excludeme
     }
     Exclude {
-        @/usr/local/etc/bacula/excludes.d/unix.conf
+        @/etc/bacula/excludes.d/unix.conf
     }
 }
 {% endif %}
