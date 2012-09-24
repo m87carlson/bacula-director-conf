@@ -11,7 +11,7 @@ import argparse
 try:
     from OpenSSL import crypto
 except:
-    print >>sys.stderr, 'Error: bcreate-fd requires OpenSSL, please install using "sudo pip install OpenSSL"'
+    print >>sys.stderr, 'Error: bcreate-fd requires OpenSSL, please install using "sudo pip install pyOpenSSL"'
     sys.exit(1)
 
 try:
